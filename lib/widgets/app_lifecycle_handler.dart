@@ -6,6 +6,7 @@ import 'package:neostation/services/logger_service.dart';
 
 import '../services/notification_service.dart';
 import '../services/neosync/auth_service.dart';
+import '../sync/open_game_return.dart';
 import '../sync/sync_manager.dart';
 import '../sync/providers/neo_sync_adapter.dart';
 import '../widgets/plan_change_notice.dart';
@@ -142,6 +143,10 @@ class _AppLifecycleHandlerState extends State<AppLifecycleHandler>
 
     if (state == AppLifecycleState.resumed) {
       await GameService.handleAppResumed();
+
+      // A game may still be open in an emulator paused behind NeoStation:
+      // upload what changed in its saves, download nothing.
+      OpenGameReturn.scheduleReturnSync();
 
       if (!mounted) return;
 

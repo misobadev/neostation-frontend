@@ -4,6 +4,7 @@ import '../models/game_model.dart';
 import '../models/system_model.dart';
 import '../providers/file_provider.dart';
 import '../sync/i_sync_provider.dart';
+import '../sync/open_game_return.dart';
 import '../services/game_service.dart';
 import '../services/game_launch_manager.dart';
 import '../widgets/game_launch_dialog.dart';
@@ -67,16 +68,17 @@ Future<void> launchGameWithDialog({
   // cancel the download. Hand the provider a matching deadline so a late
   // download that finishes after we've launched on the local save abandons its
   // write instead of clobbering the .srm the emulator now has open.
-  final syncDeadline = SyncDeadline(const Duration(seconds: 8));
+  // The sync waits first, 5s at most, for a return sync of this game still
+  // running (if it still is, this launch syncs nothing), so the launch waits
+  // 5s + 8s at worst, and it checks the saves earlier launches downloaded
+  // while the game may have been open (see OpenGameReturn.syncBeforeLaunch).
   await Future.wait([
     Future.delayed(const Duration(seconds: 2)),
-    syncProvider
-        .syncGameSavesBeforeLaunch(game, deadline: syncDeadline)
-        .timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => SyncResult.fail(SyncError.networkError),
-        )
-        .catchError((_) => SyncResult.fail(SyncError.unknown)),
+    OpenGameReturn.syncBeforeLaunch(
+      game,
+      syncProvider,
+      systemFolder: system.folderName,
+    ),
   ]);
   if (!context.mounted) {
     GameService.clearLaunchPending();

@@ -8,6 +8,8 @@ import '../../models/game_model.dart';
 import '../../models/system_model.dart';
 import '../../repositories/game_repository.dart';
 import '../../repositories/system_repository.dart';
+import '../../sync/open_game_guard.dart';
+import '../../sync/open_game_return.dart';
 import '../../sync/sync_manager.dart';
 import '../game_session_persistence.dart';
 import '../ra_library_match_runner.dart';
@@ -88,6 +90,20 @@ class GameSessionManager {
 
   /// Metadata for the currently active game.
   static GameModel? _currentGame;
+
+  /// The game whose session is running, for [OpenGameGuard]: a game is open
+  /// while its session runs, whatever the platform. A session being ended no
+  /// longer counts, so the after-close sync it starts can pull on a desktop
+  /// (on Android the launch record covers a game left open in its emulator).
+  static RunningGame? runningGame() {
+    final game = _currentGame;
+    if (!_isGameLaunched || _isEndingSession || game == null) return null;
+    return (
+      romname: game.romname,
+      systemFolder: _currentGameSystem?.folderName ?? game.systemFolderName,
+      emulatorName: _launchedEmulatorExe,
+    );
+  }
 
   /// Callback triggered when a game session terminates on Android.
   static Function(int)? _onGameReturnedCallback;
@@ -228,11 +244,17 @@ class GameSessionManager {
   }
 
   /// Registers the initiation of a game session and initializes tracking state.
+  ///
+  /// [androidPackage] is the Android emulator the game was launched with, and
+  /// [emulatorName] its name: the game may stay open in it after the session
+  /// ends, which [OpenGameGuard] records (not for an Android app).
   static void registerGameLaunch(
     SystemModel system,
-    GameModel game, [
+    GameModel game, {
     String? emulatorExeName,
-  ]) {
+    String? androidPackage,
+    String? emulatorName,
+  }) {
     _isGameLaunched = true;
     _launchPending = false;
     // Also here, not only in beginLaunchPending: a launch path that never
@@ -243,6 +265,18 @@ class GameSessionManager {
     _launchedEmulatorExe = emulatorExeName;
     _currentGameSystem = system;
     _currentGame = game;
+
+    if (androidPackage != null && emulatorExeName != 'android_app') {
+      unawaited(
+        OpenGameGuard.instance.recordLaunch(
+          package: androidPackage,
+          romname: game.romname,
+          systemFolder: system.folderName,
+          emulatorName: emulatorName,
+          romPath: game.romPath,
+        ),
+      );
+    }
 
     if (Platform.isAndroid) {
       GameSessionPersistence.saveGameSession(
@@ -336,7 +370,13 @@ class GameSessionManager {
             played: _playtimeMeter.elapsed,
           );
         }
-        _syncSavesAfterClose(game);
+        // With its system's folder, so the return sync of the game (keyed by
+        // it) knows this one is running.
+        _syncSavesAfterClose(
+          game.systemFolderName == null
+              ? game.copyWith(systemFolderName: system.folderName)
+              : game,
+        );
       }
 
       _stopPlaytimeTimer();
@@ -389,6 +429,10 @@ class GameSessionManager {
   /// died and may still be flushing its save to disk, while the exit path
   /// itself has UI waiting on it. Failures are logged and dropped — the next
   /// detect pass will pick the save up.
+  ///
+  /// On Android the emulator may only be paused behind NeoStation, with the
+  /// game open: the sync then downloads nothing ([OpenGameGuard]), and first
+  /// checks what the game's launch downloaded ([OpenGameReturn.syncGame]).
   static void _syncSavesAfterClose(GameModel game) {
     final provider = SyncManager.instance.active;
     if (provider == null) {
@@ -400,7 +444,7 @@ class GameSessionManager {
     );
     Future.delayed(const Duration(seconds: 2), () async {
       try {
-        await provider.syncGameSavesAfterClose(game);
+        await OpenGameReturn.syncGame(game, provider);
       } catch (e) {
         _log.e('Post-game save sync failed: $e');
       }

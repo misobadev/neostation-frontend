@@ -11,6 +11,7 @@ import 'package:neostation/services/global_notification_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/sfx_service.dart';
 import 'package:neostation/sync/kept_save_copies.dart';
+import 'package:neostation/sync/open_game_guard.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'gamepad_test_clock.dart';
@@ -35,7 +36,8 @@ final _game = GameModel(
 
 /// Answers with [groups] and records what it was asked to do.
 class _FakeCopies extends KeptSaveCopies {
-  _FakeCopies(this.groups) : super(NeoSyncProvider(NeoSyncService()));
+  _FakeCopies(this.groups, {super.openGames})
+    : super(NeoSyncProvider(NeoSyncService()));
 
   List<KeptSaveGroup> groups;
   KeptCopyRefusal? refusal;
@@ -328,6 +330,57 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('a game that may still be open in an emulator (NEO-285)', () {
+    Future<_FakeCopies> openInRetroArch() async {
+      final guard = OpenGameGuard(recordsLaunches: true);
+      await guard.recordLaunch(
+        package: 'com.retroarch.aarch64',
+        romname: 'Zelda.sfc',
+        systemFolder: 'snes',
+        emulatorName: 'RetroArch',
+      );
+      return _FakeCopies([
+        _group('/saves/Zelda.srm', [
+          _copy('/saves/Zelda.srm.neosync.bak', KeptCopySource.beforeDownload),
+        ]),
+      ], openGames: guard);
+    }
+
+    String body() =>
+        en(AppLocale.keptCopyRestoreBody).replaceFirst('{file}', 'Zelda.srm');
+
+    testWidgets("the game's list warns, naming the emulator, and still "
+        'restores', (tester) async {
+      final copies = await openInRetroArch();
+      await pumpView(tester, copies, game: _game);
+      await tester.tap(find.text(en(AppLocale.keptCopyRestore)));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          '${body()}\n\n'
+          '${en(AppLocale.keptCopyGameMayBeOpen).replaceFirst('{emulator}', 'RetroArch')}',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text(en(AppLocale.keptCopyRestore)).last);
+      await tester.pumpAndSettle();
+      expect(copies.restored, ['/saves/Zelda.srm.neosync.bak']);
+    });
+
+    testWidgets('the list of every game keeps the general text', (
+      tester,
+    ) async {
+      final copies = await openInRetroArch();
+      await pumpView(tester, copies);
+      await tester.tap(find.text(en(AppLocale.keptCopyRestore)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(body()), findsOneWidget);
+    });
   });
 
   testWidgets('while a game runs, says to close it and asks nothing', (

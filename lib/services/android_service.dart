@@ -78,4 +78,16 @@ class AndroidService {
       return false;
     }
   }
+
+  /// Something that changes with every boot of the device: `count:<n>`
+  /// (Android's boot count) or, where that can't be read, `time:<ms>` (when
+  /// the device started, from the clock). Null when neither can be had.
+  static Future<String?> getBootMarker() async {
+    try {
+      return await _channel.invokeMethod<String>('getBootMarker');
+    } catch (e) {
+      _log.e('Failed to read the boot marker: $e');
+      return null;
+    }
+  }
 }

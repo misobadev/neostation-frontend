@@ -16,6 +16,9 @@ library;
 class SyncDeadline {
   SyncDeadline(Duration budget) : _expiry = DateTime.now().add(budget);
 
+  /// A deadline that has already passed: every write it guards is abandoned.
+  SyncDeadline.passed() : _expiry = DateTime.fromMillisecondsSinceEpoch(0);
+
   final DateTime _expiry;
 
   /// True once the budget has elapsed; further writes must be abandoned.

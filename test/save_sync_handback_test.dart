@@ -180,6 +180,15 @@ class _FakeProvider implements ISyncProvider {
   Future<void> updateGameCloudSyncEnabled(String gameId, bool enabled) async {}
 
   @override
+  Future<bool> rebaselineIgnoredDownload(
+    String path, {
+    String? expectedHash,
+  }) async => false;
+
+  @override
+  Future<bool> markChangedOnBothSides(String path) async => false;
+
+  @override
   Future<SyncQuota?> getQuota() async => null;
 
   @override

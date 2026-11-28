@@ -722,6 +722,29 @@ void main() {
       expect(svc.uploads, ['1/Mcd001.ps2']);
       expect(provider.uploadFailures.value.games, isEmpty);
     });
+
+    test('is retried by a sweep that names the game without its extension '
+        '(NEO-285: one game, whatever form its name takes)', () async {
+      await writeCard('FIRST CARD');
+      svc.failUploads = 1;
+      await RommSaveMapRepository.putMapping(
+        source: RommLinkSource.download,
+        romname: 'GameX.iso',
+        systemFolder: 'ps2',
+        rommRomId: 1,
+      );
+
+      // Closed from a game list: the file name.
+      await provider.syncGameSavesAfterClose(_game('GameX.iso', 'ps2'));
+      expect(svc.uploads, isEmpty);
+      expect(provider.uploadFailures.value.games, isNotEmpty);
+
+      // The sweep's library rows name it without the extension.
+      await sweep();
+
+      expect(svc.uploads, ['1/Mcd001.ps2']);
+      expect(provider.uploadFailures.value.games, isEmpty);
+    });
   });
 
   group('a launch on a device with no card yet', () {

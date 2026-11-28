@@ -1158,6 +1158,8 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.keptCopyCloseGame:
       'Schließe zuerst das Spiel und versuche es dann erneut.',
   AppLocale.keptCopyWaitForSync: 'Warte, bis die Synchronisierung der Spielstände abgeschlossen ist, und versuche es dann erneut.',
+  AppLocale.keptCopyGameMayBeOpen: "Dieses Spiel ist möglicherweise noch in {emulator} geöffnet. Beende es dort zuerst, sonst schreibt der Emulator womöglich seine eigene Kopie über den wiederhergestellten Spielstand.",
+  AppLocale.openGameIgnoredDownload: "Das Spiel war im Emulator noch geöffnet, der weiter seine eigene Kopie dieses Spielstands verwendet hat. Der beim Start heruntergeladene Spielstand wurde daher nicht verwendet, und es wurde nichts hochgeladen. Beende das Spiel im Emulator und starte es dann erneut.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Cloud-Synchronisation deaktiviert',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Speicherlimit überschritten',
@@ -1631,6 +1633,7 @@ const Map<String, dynamic> appLocaleDe = {
   AppLocale.uploadingCustomFolder:
       'Spielstände aus {folder} werden hochgeladen...',
   AppLocale.customFolderUploadComplete: 'Standaloner Ordner synchronisiert: {uploaded} hochgeladen, {skipped} bereits aktuell',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Spielstände, die beim nächsten Start ihres Spiels die Kopie aus der Cloud erhalten: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Von diesem Gerät noch nie synchronisierte Speicherkarten, zurückgestellt bis zum nächsten Start eines Spiels, das sie verwendet. Dabei wird die Karte aus der Cloud verwendet und die dieses Geräts im Spielstand-Verlauf aufbewahrt: {left}",
   AppLocale.customFolderUploadFailed:
       'Synchronisierung des benutzerdefinierten Ordners fehlgeschlagen',

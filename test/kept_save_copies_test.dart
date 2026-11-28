@@ -11,6 +11,7 @@ import 'package:neostation/repositories/sync_repository.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/sync/kept_save_copies.dart';
+import 'package:neostation/sync/open_game_guard.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:path/path.dart' as p;
@@ -394,6 +395,46 @@ void main() {
       final other = (await copies().forGame(game)).single.copies.first.path;
       await copies().delete(other);
       expect(File(other).existsSync(), isFalse);
+    });
+
+    test('NEO-285: a restore while the game may still be open is allowed, '
+        'and forgets what its launch downloaded: the save was put back on '
+        'purpose', () async {
+      final guard = OpenGameGuard(recordsLaunches: true);
+      await guard.recordLaunch(
+        package: 'org.dolphinemu.dolphinemu',
+        romname: game.romname,
+        systemFolder: 'gc',
+        emulatorName: 'Dolphin',
+      );
+      await guard.recordDownload(
+        providerId: NeoSyncAdapter.kProviderId,
+        romname: game.romname,
+        systemFolder: 'gc',
+        path: save.path,
+        beforeHash: 'before',
+        downloadedHash: 'downloaded',
+      );
+      final kept = KeptSaveCopies(
+        NeoSyncProvider(NeoSyncService()),
+        activeProviderId: () => providerId,
+        locateSaves: (_) async => [save.path],
+        saveFolders: () async => [root.path],
+        gameRunning: () => false,
+        syncing: (_, _) => false,
+        openGames: guard,
+      );
+
+      expect(kept.mayBeOpenIn(game, save.path), 'Dolphin');
+      expect(kept.whyNotNow(game), isNull);
+      await kept.restore(
+        p.join(root.path, 'Zelda.sav.neosync.bak'),
+        game: game,
+      );
+
+      expect(save.readAsBytesSync(), [3]);
+      expect(guard.downloadsOf(game.romname, 'gc'), isEmpty);
+      expect(kept.mayBeOpenIn(_game('Other.iso', 'gc'), save.path), isNull);
     });
   });
 

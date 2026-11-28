@@ -1157,6 +1157,8 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.keptCopyCloseGame: 'Feche o jogo primeiro e tente novamente.',
   AppLocale.keptCopyWaitForSync:
       'Aguarde a sincronização dos saves terminar e tente novamente.',
+  AppLocale.keptCopyGameMayBeOpen: "Este jogo talvez ainda esteja aberto no {emulator}. Feche-o lá primeiro, ou o emulador poderá gravar a própria cópia por cima do save restaurado.",
+  AppLocale.openGameIgnoredDownload: "O jogo ainda estava aberto no emulador, que continuou usando a própria cópia deste save, então o save baixado ao iniciar não foi usado e nada foi enviado. Feche o jogo no emulador e inicie-o novamente.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Sincronização em nuvem desativada',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Cota de armazenamento excedida',
@@ -1625,6 +1627,7 @@ const Map<String, dynamic> appLocalePt = {
   AppLocale.removeCustomFolderConfirm: 'Remover esta pasta de save standalone? Os arquivos locais não serão excluídos, apenas desvinculados da sincronização.',
   AppLocale.uploadingCustomFolder: 'Enviando saves de {folder}...',
   AppLocale.customFolderUploadComplete: 'Pasta standalone sincronizada: {uploaded} enviados, {skipped} já atualizados',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Saves deixados para a próxima vez que o jogo for iniciado, que usará a cópia da nuvem: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Cartões de memória nunca sincronizados a partir deste dispositivo, deixados para a próxima inicialização de um jogo que os use, que usará o da nuvem e guardará o deste dispositivo no Histórico de saves: {left}",
   AppLocale.customFolderUploadFailed:
       'Falha ao sincronizar a pasta personalizada',

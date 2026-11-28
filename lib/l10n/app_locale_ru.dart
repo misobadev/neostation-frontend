@@ -1147,6 +1147,8 @@ const Map<String, dynamic> appLocaleRu = {
       'Сначала закройте игру, затем повторите попытку.',
   AppLocale.keptCopyWaitForSync:
       'Дождитесь окончания синхронизации сохранений, затем повторите попытку.',
+  AppLocale.keptCopyGameMayBeOpen: "Возможно, эта игра всё ещё открыта в {emulator}. Сначала закройте её там, иначе эмулятор может записать свою копию поверх восстановленного сохранения.",
+  AppLocale.openGameIgnoredDownload: "Игра всё ещё была открыта в эмуляторе, и он продолжил использовать свою копию этого сохранения: сохранение, скачанное при запуске, не использовалось, и ничего не было выгружено. Закройте игру в эмуляторе, затем запустите её снова.",
   AppLocale.neoSyncCloudSyncDisabled:
       'NeoSync: Облачная синхронизация выключена',
   AppLocale.neoSyncQuotaExceeded: 'NeoSync: Превышена квота хранилища',
@@ -1602,6 +1604,7 @@ const Map<String, dynamic> appLocaleRu = {
   AppLocale.removeCustomFolderConfirm: 'Удалить эту пользовательскую папку сохранений? Локальные файлы не будут удалены, только отключены от синхронизации.',
   AppLocale.uploadingCustomFolder: 'Загрузка сохранений из {folder}...',
   AppLocale.customFolderUploadComplete: 'Пользовательская папка синхронизирована: {uploaded} загружено, {skipped} уже актуальны',
+  AppLocale.customFolderUploadSavesLeftForLaunch: "Сохранения, которые получат копию из облака при следующем запуске своей игры: {left}",
   AppLocale.customFolderUploadLeftForLaunch: "Карты памяти, ещё не синхронизировавшиеся с этого устройства, отложены до следующего запуска игры, которая их использует: будет использована карта из облака, а карта с этого устройства сохранится в Истории сохранений: {left}",
   AppLocale.customFolderUploadFailed:
       'Не удалось синхронизировать пользовательскую папку',

@@ -284,6 +284,14 @@ extension NeoSyncUpload on NeoSyncProvider {
       // game's own sync. Only where the cloud list was read ([cloudFiles],
       // the standalone-folder sync).
       String? cloudCopy;
+      // The save's game may still be open in an emulator: only its launch
+      // writes the save, and the server decides a newer copy by the file's
+      // time, which the emulator moves when it writes its own copy back.
+      final gameMayBeOpen = identical(
+        _launchDeadlineFor(romName, syncSystemId),
+        NeoSyncProvider._gameMayBeOpen,
+      );
+      var cloudNewer = false;
       if (cloudFiles != null) {
         final stat = await file.stat();
         final local = LocalSaveFile(
@@ -317,6 +325,7 @@ extension NeoSyncUpload on NeoSyncProvider {
         }
         if (cloud != null) {
           final comparison = await _compareWithCloud(local, cloud);
+          cloudNewer = comparison.status == neo_sync.GameSyncStatus.cloudOnly;
           // A memory card every game of its system shares that this device
           // has never synced, and that isn't the same as the cloud's: a
           // game's own sync takes the cloud's card and keeps this one. Sent
@@ -329,6 +338,14 @@ extension NeoSyncUpload on NeoSyncProvider {
             _processedItems.add(
               "Left for the game's next launch: $relativePath (never synced "
               'here)',
+            );
+            return;
+          }
+          if (gameMayBeOpen && cloudNewer) {
+            _savesLeftForLaunchFiles++;
+            _processedItems.add(
+              "Left for the game's next launch: $relativePath (the cloud "
+              'copy is newer, and the game may still be open in an emulator)',
             );
             return;
           }
@@ -346,6 +363,21 @@ extension NeoSyncUpload on NeoSyncProvider {
         }
       }
 
+      // A save the emulator wrote back over a launch's download, its record
+      // reset to it so the next launch downloads the cloud copy again
+      // ([rebaselineIgnoredDownload]): never sent from here, open game or not
+      // (another game launched since, or a reboot), or the server would take
+      // it as newer by its time. The next launch, or the game's own sync,
+      // takes the cloud copy.
+      if (await _resetForNextLaunch(file)) {
+        _savesLeftForLaunchFiles++;
+        _processedItems.add(
+          "Left for the game's next launch: $relativePath (the emulator "
+          'ignored the save its launch downloaded)',
+        );
+        return;
+      }
+
       final result = await _neoSyncService.syncFile(
         file,
         gameName,
@@ -358,14 +390,10 @@ extension NeoSyncUpload on NeoSyncProvider {
         type: syncType,
         // As for a game's own upload: a newer cloud copy is only written while
         // no launch of the save's game, or on a system whose games share
-        // memory cards (a PS2 or Dreamcast card), of that system, has gone ahead.
-        deadline: () {
-          final system = syncSystemId;
-          return (romName == null ? null : _launchDeadlines[romName]) ??
-              (_sharesMemoryCards(system)
-                  ? _launchDeadlines[NeoSyncProvider._systemLaunchKey(system!)]
-                  : null);
-        },
+        // memory cards (a PS2 or Dreamcast card), of that system, has gone
+        // ahead, and, while that game may still be open in an emulator, only
+        // by its launch.
+        deadline: () => _launchDeadlineFor(romName, syncSystemId),
       );
 
       // One tidy, whether or not the upload went through, keeping both
@@ -398,6 +426,17 @@ extension NeoSyncUpload on NeoSyncProvider {
         if (result['downloaded'] == true && keptLocal is String) {
           reportNewerCloudCopy(gameName: gameName, savePath: file.path);
         }
+      } else if (result['abandoned'] == true &&
+          identical(
+            _launchDeadlineFor(romName, syncSystemId),
+            NeoSyncProvider._gameMayBeOpen,
+          )) {
+        // Not a failure: the newer cloud copy waits for the game's launch.
+        _savesLeftForLaunchFiles++;
+        _processedItems.add(
+          "Left for the game's next launch: $relativePath (the game may "
+          'still be open in an emulator)',
+        );
       } else {
         final errorMessage = result['message'] ?? '';
         _processedItems.add('Failed to upload: $relativePath - $errorMessage');
@@ -411,6 +450,21 @@ extension NeoSyncUpload on NeoSyncProvider {
       } else {
         rethrow;
       }
+    }
+  }
+
+  /// Whether [file]'s record was reset by [rebaselineIgnoredDownload]: it
+  /// holds the file's bytes with no cloud copy seen.
+  Future<bool> _resetForNextLaunch(File file) async {
+    try {
+      final record = await _syncRecord(file.path);
+      if (record == null || (record['cloud_updated_at'] as int? ?? -1) != 0) {
+        return false;
+      }
+      final hash = _neoSyncService.calculateFileHash(await file.readAsBytes());
+      return record['file_hash'] == hash;
+    } on FileSystemException {
+      return false;
     }
   }
 
@@ -446,6 +500,14 @@ extension NeoSyncUpload on NeoSyncProvider {
       _isSyncing = false;
       return CustomFolderUploadOutcome.noFolder;
     }
+    // A save the emulator wrote back over a launch's download would read as
+    // a change to upload: told apart first.
+    try {
+      await _checkLaunchDownloads();
+    } catch (_) {
+      _isSyncing = false;
+      rethrow;
+    }
 
     // Neither clears nor sets the provider-wide error: that error turns every
     // game's NeoSync mark red, and this upload's outcome is reported to its
@@ -458,6 +520,7 @@ extension NeoSyncUpload on NeoSyncProvider {
     _uploadedFiles = 0;
     _skippedFiles = 0;
     _leftForLaunchFiles = 0;
+    _savesLeftForLaunchFiles = 0;
     _downloadedFiles = 0;
     _processedItems = [];
     notify();
@@ -543,11 +606,13 @@ extension NeoSyncUpload on NeoSyncProvider {
           _processedFiles -
           _uploadedFiles -
           _skippedFiles -
-          _leftForLaunchFiles;
+          _leftForLaunchFiles -
+          _savesLeftForLaunchFiles;
       _syncProgress = 1.0;
       _syncStatus =
           'Upload complete: $_uploadedFiles uploaded, $_skippedFiles already '
-          'synced, $_leftForLaunchFiles left for a launch, $failed failed';
+          'synced, ${_leftForLaunchFiles + _savesLeftForLaunchFiles} left for '
+          'a launch, $failed failed';
       _processedItems.add(_syncStatus);
       return failed > 0
           ? CustomFolderUploadOutcome.failed

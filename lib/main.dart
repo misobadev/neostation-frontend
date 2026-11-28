@@ -20,7 +20,12 @@ import 'package:neostation/screens/main_screen.dart';
 import 'package:neostation/services/neosync/auth_service.dart';
 import 'package:neostation/services/neosync/neo_sync_service.dart';
 import 'package:neostation/services/neosync/billing_service.dart';
+import 'package:neostation/sync/open_game_guard.dart';
+import 'package:neostation/sync/open_game_return.dart';
 import 'package:neostation/sync/sync_manager.dart';
+import 'package:neostation/repositories/open_game_repository.dart';
+import 'package:neostation/services/android_service.dart';
+import 'package:neostation/services/game/game_session_manager.dart';
 import 'package:neostation/sync/providers/neo_sync_adapter.dart';
 import 'package:neostation/sync/providers/romm_provider.dart';
 import 'package:neostation/services/notification_service.dart';
@@ -450,6 +455,27 @@ void main() async {
   // nothing when it already finished.
   await fileProvider.initialize();
 
+  // Which games may still be open in an emulator, from before this start
+  // (cleared by a reboot): no sync but a launch writes their saves. Read
+  // before any sync can run. A desktop knows when an emulator exits, so only
+  // a running session counts there and nothing is kept.
+  OpenGameGuard.instance = OpenGameGuard(
+    store: Platform.isAndroid
+        ? const FunctionOpenGameStore(
+            reader: OpenGameRepository.read,
+            writer: OpenGameRepository.write,
+          )
+        : null,
+    bootMarker: Platform.isAndroid ? AndroidService.getBootMarker : null,
+    recordsLaunches: Platform.isAndroid,
+    runningGame: GameSessionManager.runningGame,
+  );
+  try {
+    await OpenGameGuard.instance.load();
+  } catch (e) {
+    log.e('Error reading the games that may still be open: $e');
+  }
+
   // Inicializar listener de Android para tracking de tiempo de juego
   if (Platform.isAndroid) {
     try {
@@ -548,6 +574,15 @@ void main() async {
   SyncManager.instance.restoreActive(
     sqliteConfigProvider.config.activeSyncProvider,
   );
+
+  // A save an emulator wrote back over a launch's download while NeoStation
+  // was closed (Android killed it behind the emulator, or the device
+  // restarted) is told apart before any sync could upload it. Local only.
+  try {
+    await OpenGameReturn.checkLaunchDownloads();
+  } catch (e) {
+    log.e('Error checking the saves launches downloaded: $e');
+  }
 
   runApp(
     MyApp(

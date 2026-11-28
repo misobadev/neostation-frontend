@@ -47,11 +47,19 @@ class KeptCopyName {
     required this.source,
     this.stampedAt,
     this.firstSync = false,
+    this.launch = false,
   });
 
   final String savePath;
   final KeptCopySource source;
   final DateTime? stampedAt;
+
+  /// The server's copy kept by a launch of a game that may still have been
+  /// open in an emulator ([neoSyncLaunchCopyPath], [rommLaunchCopyPath]): one
+  /// per save, which the next such launch replaces. Like a before-download
+  /// slot it doesn't count towards [maxKeptCopiesPerSave], so it never
+  /// pushes out a conflict copy or a copy of this device's save.
+  final bool launch;
 
   /// A memory card's first sync from this device kept it: this device's card
   /// from before the server's replaced it, which nothing removes but the user.
@@ -146,6 +154,9 @@ KeptCopyName? _parseKeptCopyName(String path) {
       savePath: save(m.group(1)!),
       source: KeptCopySource.otherDevice,
       stampedAt: _utcStamp(m.group(2)),
+      launch: name.toLowerCase().endsWith(
+        '.cloud-$launchCopyTag$keptCopyEnding',
+      ),
     );
   }
   m = _replaced.firstMatch(name);
@@ -201,9 +212,52 @@ KeptCopyName? _parseKeptCopyName(String path) {
       savePath: save(m.group(1)!),
       source: KeptCopySource.serverConflict,
       stampedAt: _localStamp(m.group(2)!),
+      launch: m.group(2)!.toLowerCase() == launchCopyTag,
     );
   }
   return null;
+}
+
+/// What a launch copy's name has where other copies have a time.
+const String launchCopyTag = 'launch';
+
+/// Where NeoSync keeps the cloud's copy of the save at [savePath] that a
+/// launch downloaded while the game may still have been open in an emulator:
+/// `<save>.cloud-launch.neosync.bak`, listed as from another device (the
+/// same kind of copy). One name per save, so the next such launch replaces
+/// it. A cloud checksum is hex, so no other cloud copy has this name.
+String neoSyncLaunchCopyPath(String savePath) =>
+    '$savePath.cloud-$launchCopyTag$keptCopyEnding';
+
+/// As [neoSyncLaunchCopyPath], for RomM: `<save>.romm-conflict-launch`,
+/// listed as from the server, before an upload (the same kind of copy). A
+/// conflict copy has a time there, so none has this name.
+String rommLaunchCopyPath(String savePath) =>
+    '$savePath$serverConflictMarker$launchCopyTag';
+
+/// Writes [bytes] as the launch copy at [copyPath], replacing the previous
+/// launch copy of that save. A link or anything but a file at that name is
+/// left alone and nothing is written (returns false). The copy is then
+/// created exclusively, so a link put at the name before that fails the
+/// create rather than being followed; the bytes are written by path just
+/// after (dart:io has no exclusive open), as for every kept copy here. A
+/// copy cut short is removed, and the error rethrown.
+Future<bool> writeLaunchCopy(String copyPath, List<int> bytes) async {
+  final type = await FileSystemEntity.type(copyPath, followLinks: false);
+  if (type == FileSystemEntityType.file) {
+    await File(copyPath).delete();
+  } else if (type != FileSystemEntityType.notFound) {
+    return false;
+  }
+  final file = File(copyPath);
+  await file.create(exclusive: true);
+  try {
+    await file.writeAsBytes(bytes, flush: true);
+  } catch (_) {
+    await _deleteQuietly(file);
+    rethrow;
+  }
+  return true;
 }
 
 /// `yyyy-MM-dd_HH-mm-ss` as a local time (RomM's copies are named with the
@@ -648,7 +702,8 @@ const int maxKeptCopiesPerSave = 3;
 /// * beyond [limit], the copies kept least recently. The before-download
 ///   copies with no time in their name (NeoSync's `<save>.neosync.bak`,
 ///   RomM's `<save>.romm-local-last`) are each one slot that downloads
-///   overwrite, so they can't pile up and aren't counted; dated ones count,
+///   overwrite, so they can't pile up and aren't counted, nor is a launch
+///   copy ([KeptCopyName.launch]), one per save too; dated ones count,
 ///   except the copy a memory card's first sync from this device kept
 ///   ([keepRommFirstSyncCopy]), which is never removed for being one too many.
 ///
@@ -683,6 +738,7 @@ Future<List<String>> tidyKeptCopies(
           bool justKept,
           bool slot,
           bool firstSync,
+          bool launch,
         })
       >[];
   Future<void> consider(String path) async {
@@ -707,10 +763,12 @@ Future<List<String>> tidyKeptCopies(
         // A single before-download slot, which downloads overwrite; a dated
         // copy of this device's save counts like any other.
         slot:
-            (name.source == KeptCopySource.beforeDownload ||
-                name.source == KeptCopySource.rommBeforeDownload) &&
-            name.stampedAt == null,
+            name.launch ||
+            ((name.source == KeptCopySource.beforeDownload ||
+                    name.source == KeptCopySource.rommBeforeDownload) &&
+                name.stampedAt == null),
         firstSync: name.firstSync,
+        launch: name.launch,
       ));
     } on FileSystemException {
       return;
@@ -737,8 +795,12 @@ Future<List<String>> tidyKeptCopies(
     // RomM's slot for a card comes last: when it holds the same bytes as a
     // dated copy, the slot is the one removed, since the next routine
     // download replaces it anyway.
-    final aRommSlot = a.slot && a.source == KeptCopySource.rommBeforeDownload;
-    final bRommSlot = b.slot && b.source == KeptCopySource.rommBeforeDownload;
+    // A launch copy too: a duplicate of a conflict copy, it is the one that
+    // goes, never the conflict copy.
+    final aRommSlot =
+        a.launch || (a.slot && a.source == KeptCopySource.rommBeforeDownload);
+    final bRommSlot =
+        b.launch || (b.slot && b.source == KeptCopySource.rommBeforeDownload);
     if (aRommSlot != bRommSlot) return aRommSlot ? 1 : -1;
     if (a.justKept != b.justKept) return a.justKept ? -1 : 1;
     return b.modified.compareTo(a.modified);

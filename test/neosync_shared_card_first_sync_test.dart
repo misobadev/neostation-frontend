@@ -580,6 +580,7 @@ void main() {
             expect(local.readAsBytesSync(), older);
             expect(outcome, CustomFolderUploadOutcome.uploaded);
             expect(provider.leftForLaunchFiles, 1);
+            expect(provider.savesLeftForLaunchFiles, 0);
             expect(provider.skippedFiles, 0);
           },
         );
